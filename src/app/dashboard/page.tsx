@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from 'react';
 
+interface GenerationItem {
+  id: number;
+  type: string;
+  description: string;
+  status: string;
+}
+
 export default function DashboardPage() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<GenerationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
