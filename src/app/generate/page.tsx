@@ -5,7 +5,7 @@ import { useState } from 'react';
 export default function GeneratePage() {
   const [type, setType] = useState('image');
   const [prompt, setPrompt] = useState('');
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
@@ -19,7 +19,7 @@ export default function GeneratePage() {
       });
       const data = await res.json();
       setResult(JSON.stringify(data));
-    } catch (err) {
+    } catch (err: any) {
       setResult('шибка: ' + err.message);
     } finally {
       setLoading(false);
