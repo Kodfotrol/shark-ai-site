@@ -27,9 +27,10 @@ export default function Shark({ className = '' }: SharkProps) {
     // Shark state
     const shark = {
       x: -200,
-      y: Math.random() * (window.innerHeight - 200) + 100,
+      y: Math.random() * (canvas.height - 200) + 100,
       speed: 1.5 + Math.random() * 1.5,
       scale: 0.8 + Math.random() * 0.4,
+      angle: 0,
       tailPhase: 0,
       bodyPhase: 0,
       direction: 1, // 1 = right, -1 = left
@@ -67,7 +68,6 @@ export default function Shark({ className = '' }: SharkProps) {
       ctx.beginPath();
       ctx.moveTo(70, 5);
       ctx.bezierCurveTo(40, 20, -20, 25, -60, 15);
-      // @ts-ignore
       ctx.bezierCurveTo(-90, 5, -90, 5, -60, -5);
       ctx.bezierCurveTo(-20, -15, 40, -10, 70, -5);
       ctx.closePath();
