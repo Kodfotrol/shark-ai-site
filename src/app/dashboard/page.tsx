@@ -1,16 +1,8 @@
-﻿'use client';
-
+'use client';
 import { useEffect, useState } from 'react';
 
-interface GenerationItem {
-  id: number;
-  type: string;
-  description: string;
-  status: string;
-}
-
 export default function DashboardPage() {
-  const [items, setItems] = useState<GenerationItem[]>([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,8 +16,8 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-black text-white p-8">
-      <h1 className="text-3xl font-bold mb-4">📋 стория генераций</h1>
-      {loading ? <p>агрузка...</p> : items.length === 0 ? <p>ока ничего не сгенерировано.</p> : (
+      <h1 className="text-3xl font-bold mb-4">📋 История генераций</h1>
+      {loading ? <p>Загрузка...</p> : items.length === 0 ? <p>Пока ничего не сгенерировано.</p> : (
         <ul className="space-y-2">
           {items.map((item) => (
             <li key={item.id} className="bg-gray-900 rounded p-3">
