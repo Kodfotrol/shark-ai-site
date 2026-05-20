@@ -1,178 +1,68 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { AnimationMixer, Vector3 } from 'three';
 
-const SharkScene = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+const Shark = () => {
+  const gltf = useLoader(GLTFLoader, '/models/shark.glb');
+  const mixer = useRef<AnimationMixer>();
+  const target = useMemo(() => new Vector3(), []);
+  const position = useRef(new Vector3(0, 0, 0));
+  const velocity = useRef(new Vector3());
+  const attackMode = useRef(false);
+  const attackCooldown = useRef(0);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    // Параметры акулы
-    let shark = {
-      x: canvas.width / 2,
-      y: canvas.height / 2,
-      vx: 1.2,
-      vy: 0.4,
-      direction: 1, // 1 = right, -1 = left
-      targetX: canvas.width / 2,
-      targetY: canvas.height / 2,
-      mouthOpen: 0, // 0..1
-      attackMode: false,
-      attackCooldown: 0,
-    };
-
-    // Функция для смены цели
-    const newTarget = () => {
-      shark.targetX = Math.random() * canvas.width * 0.8 + canvas.width * 0.1;
-      shark.targetY = Math.random() * canvas.height * 0.8 + canvas.height * 0.1;
-      // Иногда включаем режим атаки
-      if (Math.random() < 0.3 && shark.attackCooldown <= 0) {
-        shark.attackMode = true;
-        shark.attackCooldown = 120;
-      }
-    };
+    if (gltf.animations.length) {
+      mixer.current = new AnimationMixer(gltf.scene);
+      mixer.current.clipAction(gltf.animations[0]).play();
+    }
     newTarget();
-    setInterval(newTarget, 3000 + Math.random() * 2000);
-
-    // Рисование акулы
-    const drawShark = () => {
-      ctx.save();
-      ctx.translate(shark.x, shark.y);
-      ctx.scale(shark.direction, 1);
-
-      // Хвост
-      ctx.beginPath();
-      ctx.moveTo(-70, 0);
-      ctx.lineTo(-100, -25 + Math.sin(Date.now() * 0.01) * 5);
-      ctx.lineTo(-100, 25 + Math.sin(Date.now() * 0.01) * 5);
-      ctx.closePath();
-      ctx.fillStyle = '#6B7B8D';
-      ctx.fill();
-
-      // Тело
-      ctx.beginPath();
-      ctx.moveTo(70, 0);
-      ctx.quadraticCurveTo(30, -35, -30, -25);
-      ctx.lineTo(-70, -5);
-      ctx.lineTo(-70, 5);
-      ctx.quadraticCurveTo(-30, 30, 30, 35);
-      ctx.quadraticCurveTo(60, 28, 70, 0);
-      ctx.fillStyle = '#5A6B7C';
-      ctx.fill();
-      ctx.strokeStyle = '#3A4B5C';
-      ctx.stroke();
-
-      // Плавники
-      ctx.beginPath();
-      ctx.moveTo(20, -30);
-      ctx.quadraticCurveTo(10, -55, -10, -40);
-      ctx.quadraticCurveTo(0, -25, 15, -15);
-      ctx.fillStyle = '#4A5B6C';
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.moveTo(20, 30);
-      ctx.quadraticCurveTo(10, 55, -10, 40);
-      ctx.quadraticCurveTo(0, 25, 15, 15);
-      ctx.fill();
-
-      // Глаз
-      ctx.beginPath();
-      ctx.arc(30, -8, 6, 0, Math.PI * 2);
-      ctx.fillStyle = 'white';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(32, -8, 3, 0, Math.PI * 2);
-      ctx.fillStyle = 'black';
-      ctx.fill();
-
-      // Пасть
-      const mouthY = 5 + shark.mouthOpen * 12;
-      ctx.beginPath();
-      ctx.moveTo(50, 0);
-      ctx.quadraticCurveTo(60, mouthY, 30, mouthY);
-      ctx.lineTo(10, mouthY);
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Зубы
-      for (let i = 0; i < 5; i++) {
-        ctx.beginPath();
-        ctx.moveTo(45 - i * 8, 0);
-        ctx.lineTo(45 - i * 8 - 3, mouthY * 0.7);
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    };
-
-    // Главный цикл анимации
-    const animate = () => {
-      // Обновление позиции
-      const dx = shark.targetX - shark.x;
-      const dy = shark.targetY - shark.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist > 1) {
-        shark.x += (dx / dist) * shark.vx;
-        shark.y += (dy / dist) * shark.vy;
-      }
-
-      // Направление
-      if (dx > 0) shark.direction = 1;
-      else if (dx < 0) shark.direction = -1;
-
-      // Открытие пасти
-      if (shark.attackMode) {
-        shark.mouthOpen = Math.min(1, shark.mouthOpen + 0.02);
-        if (shark.mouthOpen >= 1) {
-          shark.attackMode = false;
-        }
-      } else {
-        shark.mouthOpen = Math.max(0, shark.mouthOpen - 0.01);
-      }
-
-      // Кулдаун атаки
-      if (shark.attackCooldown > 0) shark.attackCooldown--;
-
-      // Отрисовка
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Фон
-      ctx.fillStyle = '#001122';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      // Лучи света
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-      for (let i = 0; i < 5; i++) {
-        ctx.beginPath();
-        ctx.moveTo(canvas.width * 0.2 + i * 150, 0);
-        ctx.lineTo(canvas.width * 0.1 + i * 100, canvas.height);
-        ctx.stroke();
-      }
-
-      drawShark();
-      requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const interval = setInterval(newTarget, 3000);
+    return () => clearInterval(interval);
   }, []);
 
-  return <canvas ref={canvasRef} className="fixed inset-0 z-10" />;
+  const newTarget = () => {
+    target.set(
+      (Math.random() - 0.5) * 10,
+      (Math.random() - 0.5) * 4,
+      (Math.random() - 0.5) * 6 - 5
+    );
+    if (Math.random() < 0.3 && attackCooldown.current <= 0) {
+      attackMode.current = true;
+      attackCooldown.current = 120;
+      target.set(0, 0, 1);
+    }
+  };
+
+  useFrame((_, delta) => {
+    if (mixer.current) mixer.current.update(delta);
+    const pos = position.current;
+    const vel = velocity.current;
+    const dir = new Vector3().copy(target).sub(pos).normalize();
+    vel.lerp(dir, 0.05);
+    pos.add(vel.clone().multiplyScalar(delta * 2));
+    gltf.scene.position.copy(pos);
+    gltf.scene.lookAt(pos.clone().add(vel));
+    if (attackMode.current && pos.distanceTo(target) < 0.5) {
+      attackMode.current = false;
+    }
+    if (attackCooldown.current > 0) attackCooldown.current--;
+  });
+
+  return <primitive object={gltf.scene} />;
 };
 
-export default SharkScene;
+export default function SharkScene() {
+  return (
+    <div className="fixed inset-0 z-10 bg-black">
+      <Canvas camera={{ position: [0, 0, 5], fov: 60 }}>
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[5, 5, 5]} intensity={1} />
+        <Shark />
+      </Canvas>
+    </div>
+  );
+}
