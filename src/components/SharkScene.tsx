@@ -2,7 +2,7 @@
 
 import { Suspense, useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
-import { Environment, OrbitControls, Float } from '@react-three/drei';
+import { Environment, Float } from '@react-three/drei';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import * as THREE from 'three';
 
@@ -62,116 +62,96 @@ function Shark({ onLoad }: SharkProps) {
         }
         setIsAttacking(true);
         setAttackPhase('approach');
+        speed.current = 0.04;
         
         setTimeout(() => {
-          setIsAttacking(false);
-          setAttackPhase('idle');
-          updateTarget();
-        }, 3000);
+          setAttackPhase('bite');
+        }, 2000);
+        
+        setTimeout(() => {
+          setAttackPhase('retreat');
+          speed.current = 0.03;
+          
+          setTimeout(() => {
+            setIsAttacking(false);
+            setAttackPhase('idle');
+            speed.current = 0.015;
+            updateTarget();
+          }, 2000);
+        }, 2500);
       }
-    }, 2000);
+    }, 5000);
     
     return () => clearInterval(attackInterval);
   }, [isAttacking]);
 
-  useFrame((state, delta, xrFrame) => {
+  useFrame((state, delta) => {
     if (!sharkRef.current) return;
-
+    
     if (mixerRef.current) {
       mixerRef.current.update(delta);
     }
-
-    const shark = sharkRef.current;
-    const lerpFactor = 0.02;
-
-    if (isAttacking) {
-      if (attackPhase === 'approach') {
-        const cameraPos = state.camera.position;
-        const direction = new THREE.Vector3();
-        direction.subVectors(cameraPos, shark.position).normalize();
-        
-        shark.position.add(direction.multiplyScalar(speed.current * 2));
-        shark.lookAt(cameraPos);
-      } else if (attackPhase === 'bite') {
-        // Bite animation
-      } else if (attackPhase === 'retreat') {
-        const direction = new THREE.Vector3();
-        direction.subVectors(attackStartPos.current, shark.position).normalize();
-        shark.position.add(direction.multiplyScalar(speed.current));
-      }
-    } else {
-      // WANDER BEHAVIOR
-      const dist = shark.position.distanceTo(targetPosition.current);
-      
-      if (dist < 0.5) {
-        updateTarget();
-      } else {
-        const direction = new THREE.Vector3();
-        direction.subVectors(targetPosition.current, shark.position).normalize();
-        shark.position.add(direction.multiplyScalar(speed.current));
-        
-        // Smooth rotation
-        const targetQuat = new THREE.Quaternion();
-        const lookMatrix = new THREE.Matrix4();
-        lookMatrix.lookAt(shark.position, targetPosition.current, shark.up);
-        targetQuat.setFromRotationMatrix(lookMatrix);
-        shark.quaternion.slerp(targetQuat, lerpFactor);
-      }
+    
+    const pos = sharkRef.current.position;
+    const dist = pos.distanceTo(targetPosition.current);
+    
+    if (dist < 0.5 && !isAttacking) {
+      updateTarget();
     }
+    
+    const dir = new THREE.Vector3()
+      .subVectors(targetPosition.current, pos)
+      .normalize();
+    
+    pos.add(dir.multiplyScalar(speed.current));
+    
+    if (attackPhase === 'approach') {
+      pos.z = THREE.MathUtils.lerp(pos.z, 2, 0.02);
+    } else if (attackPhase === 'retreat') {
+      pos.z = THREE.MathUtils.lerp(pos.z, -8, 0.02);
+    }
+    
+    const lookTarget = new THREE.Vector3()
+      .copy(pos)
+      .add(dir);
+    sharkRef.current.lookAt(lookTarget);
   });
 
   return (
     <primitive 
       object={gltf.scene} 
       ref={sharkRef}
-      scale={3} 
-      position={[0, 0, 0]}
+      scale={1.5}
+      rotation={[0, Math.PI, 0]}
     />
   );
 }
 
-function Loading() {
-  return (
-    <mesh>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="gray" wireframe />
-    </mesh>
-  );
+function LoadingFallback() {
+  return null;
 }
 
 export default function SharkScene() {
-  const [loaded, setLoaded] = useState(false);
-
   return (
-    <div style={{ width: '100%', height: '100vh', background: '#001420' }}>
-      <Canvas camera={{ position: [0, 2, 10], fov: 60 }}>
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
-        <pointLight position={[-10, -10, -5]} intensity={0.5} color="#00ffff" />
+    <div className="fixed inset-0 -z-10">
+      <Canvas
+        camera={{ position: [0, 0, 8], fov: 60 }}
+        style={{ background: 'transparent' }}
+      >
+        <ambientLight intensity={0.3} />
+        <spotLight 
+          position={[10, 10, 10]} 
+          angle={0.15} 
+          penumbra={1} 
+          intensity={1}
+          castShadow
+        />
+        <pointLight position={[-10, -10, -10]} intensity={0.5} color="#4a9eff" />
         
-        <Suspense fallback={<Loading />}>
-          <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
-            <Shark onLoad={() => setLoaded(true)} />
-          </Float>
+        <Suspense fallback={<LoadingFallback />}>
+          <Shark />
           <Environment preset="night" />
         </Suspense>
-        
-        <OrbitControls 
-          enablePan={false} 
-          minDistance={5} 
-          maxDistance={20}
-          autoRotate={!loaded}
-          autoRotateSpeed={0.5}
-        />
-        
-        {/* Ocean floor */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]}>
-          <planeGeometry args={[100, 100]} />
-          <meshStandardMaterial color="#0a1520" />
-        </mesh>
-        
-        {/* Caustics effect */}
-        <fog attach="fog" args={['#001420', 5, 30]} />
       </Canvas>
     </div>
   );
