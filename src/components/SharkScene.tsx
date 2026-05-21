@@ -1,134 +1,95 @@
 'use client';
 
-import { Suspense, useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, Float, Stars } from '@react-three/drei';
+import { useGLTF, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 
 function Shark() {
-  const { scene, animations } = useGLTF('/models/shark.glb');
+  const { scene } = useGLTF('/models/shark.glb');
   const sharkRef = useRef<THREE.Group>(null);
-  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const targetRef = useRef(new THREE.Vector3(0, -2, -8));
-  const isAttackingRef = useRef(false);
-  const attackPhaseRef = useRef<'idle' | 'approach' | 'retreat'>('idle');
-  const lastTargetChangeRef = useRef(0);
 
-  // Настройка анимаций
-  useEffect(() => {
-    if (animations.length > 0 && sharkRef.current) {
-      mixerRef.current = new THREE.AnimationMixer(sharkRef.current);
-      animations.forEach((clip) => {
-        const action = mixerRef.current?.clipAction(clip);
-        action?.play();
-      });
-    }
-  }, [animations]);
+  // Позиция и движение
+  const posRef = useRef(new THREE.Vector3(0, 0, -8));
+  const targetRef = useRef(new THREE.Vector3(2, 0, -6));
+  const directionRef = useRef(1);
+  const swimPhaseRef = useRef(0);
 
-  // Инициализация позиции
+  // Инициализация при загрузке
   useEffect(() => {
     if (sharkRef.current) {
-      sharkRef.current.position.set(0, -2, -8);
-      sharkRef.current.rotation.set(0, Math.PI, 0);
+      posRef.current.set(0, 0, -8);
+      targetRef.current.set(2, 0, -6);
     }
   }, []);
 
-  // Основной цикл анимации
+  // Анимация плавания - выполняется каждый кадр
   useFrame((state, delta) => {
     if (!sharkRef.current) return;
 
-    // Обновление анимации
-    if (mixerRef.current) {
-      mixerRef.current.update(delta);
-    }
-
     const shark = sharkRef.current;
-    const target = targetRef.current;
-    const now = state.clock.elapsedTime;
+    const time = state.clock.elapsedTime;
+    swimPhaseRef.current += delta * 2;
 
-    // Меняем цель каждые 3-5 секунд
-    if (now - lastTargetChangeRef.current > 3 + Math.random() * 2) {
-      lastTargetChangeRef.current = now;
+    // Непрерывное плавание - движение по синусоиде
+    const swimX = Math.sin(time * 0.5) * 3;
+    const swimY = Math.sin(time * 0.3) * 0.5;
+    const swimZ = -8 + Math.sin(time * 0.2) * 1;
 
-      // 30% шанс атаки
-      if (Math.random() < 0.3 && attackPhaseRef.current === 'idle') {
-        isAttackingRef.current = true;
-        attackPhaseRef.current = 'approach';
-        // Цель - ближе к камере
-        target.set(
-          (Math.random() - 0.5) * 2,
-          (Math.random() - 0.5) * 1,
-          -3
-        );
-      } else {
-        // Обычное случайное движение
-        attackPhaseRef.current = 'idle';
-        isAttackingRef.current = false;
-        target.set(
-          (Math.random() - 0.5) * 6,
-          (Math.random() - 0.5) * 2,
-          -5 - Math.random() * 4
-        );
-      }
-    }
-
-    // Плавное движение к цели
-    const speed = isAttackingRef.current ? 0.03 : 0.008;
-    shark.position.lerp(target, speed);
+    shark.position.set(swimX, swimY, swimZ);
 
     // Поворот по направлению движения
-    if (shark.position.distanceTo(target) > 0.1) {
-      const lookTarget = new THREE.Vector3(target.x, target.y, target.z + 3);
-      shark.lookAt(lookTarget);
-    }
+    const targetX = swimX + Math.cos(time * 0.5) * 2;
+    shark.lookAt(targetX, swimY, swimZ + 1);
 
-    // Плавное покачивание
-    shark.rotation.z = Math.sin(now * 0.8) * 0.1;
-    shark.rotation.x = Math.sin(now * 0.5) * 0.05 + 0.1;
+    // Покачивание хвоста (вращение вокруг Z)
+    shark.rotation.z += delta * 3;
+
+    // Плавное покачивание тела
+    shark.rotation.x = Math.sin(time * 0.8) * 0.1;
+    shark.rotation.y = Math.PI + Math.sin(time * 0.5) * 0.2;
   });
 
-  // Клонируем сцену для анимаций
+  // Клонируем сцену
   const clonedScene = scene.clone();
 
   return (
-    <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.2}>
+    <group ref={sharkRef} position={[0, 0, -8]}>
       <primitive
-        ref={sharkRef}
         object={clonedScene}
-        scale={0.5}
-        position={[0, -2, -8]}
+        scale={0.6}
         rotation={[0, Math.PI, 0]}
       />
-    </Float>
+    </group>
   );
 }
 
 function LoadingFallback() {
   return (
-    <mesh position={[0, -2, -8]}>
-      <boxGeometry args={[2, 1, 0.5]} />
+    <mesh position={[0, 0, -8]}>
+      <boxGeometry args={[3, 1.5, 1]} />
       <meshStandardMaterial color="#4488cc" wireframe />
     </mesh>
   );
 }
 
-// Частицы (подводный планктон)
+// Частицы
 function Particles() {
   const particlesRef = useRef<THREE.Points>(null);
 
   useFrame((state) => {
     if (particlesRef.current) {
-      particlesRef.current.rotation.y = state.clock.elapsedTime * 0.02;
+      particlesRef.current.rotation.y = state.clock.elapsedTime * 0.01;
     }
   });
 
-  const particleCount = 500;
+  const particleCount = 300;
   const positions = new Float32Array(particleCount * 3);
 
   for (let i = 0; i < particleCount; i++) {
-    positions[i * 3] = (Math.random() - 0.5) * 20;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 15;
-    positions[i * 3 + 2] = -5 - Math.random() * 15;
+    positions[i * 3] = (Math.random() - 0.5) * 25;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 20;
+    positions[i * 3 + 2] = -3 - Math.random() * 15;
   }
 
   return (
@@ -142,10 +103,10 @@ function Particles() {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.03}
-        color="#88ccff"
+        size={0.04}
+        color="#66aaff"
         transparent
-        opacity={0.6}
+        opacity={0.5}
         sizeAttenuation
       />
     </points>
@@ -160,45 +121,31 @@ export default function SharkScene() {
         gl={{ antialias: true, alpha: true }}
       >
         <Suspense fallback={<LoadingFallback />}>
-          {/* Тёмно-синий подводный фон */}
-          <color attach="background" args={['#001122']} />
-          <fog attach="fog" args={['#001122', 3, 18]} />
+          {/* Подводный фон */}
+          <color attach="background" args={['#000a18']} />
+          <fog attach="fog" args={['#000a18', 5, 20]} />
 
-          {/* Освещение */}
-          <ambientLight intensity={0.3} color="#224466" />
-          <directionalLight
-            position={[5, 10, 2]}
-            intensity={0.8}
-            color="#4488aa"
-          />
-          <pointLight
-            position={[0, 5, -5]}
-            intensity={0.5}
-            color="#00aaff"
-            distance={15}
-          />
-          <pointLight
-            position={[-5, -3, -8]}
-            intensity={0.3}
-            color="#004466"
-            distance={10}
-          />
+          {/* Световые лучи сверху */}
+          <directionalLight position={[0, 10, 5]} intensity={0.6} color="#1a3a5c" />
+          <ambientLight intensity={0.4} color="#0a1a2a" />
+          <pointLight position={[3, 4, -3]} intensity={0.5} color="#004488" distance={12} />
+          <pointLight position={[-3, 2, -5]} intensity={0.4} color="#002244" distance={10} />
 
-          {/* Акула */}
+          {/* Акула с анимацией */}
           <Shark />
 
-          {/* Подводные частицы */}
+          {/* Частицы */}
           <Particles />
 
-          {/* Звёзды (как подводные пузыри) */}
+          {/* Пузыри */}
           <Stars
-            radius={20}
-            depth={10}
-            count={300}
-            factor={2}
+            radius={25}
+            depth={15}
+            count={400}
+            factor={3}
             saturation={0}
             fade
-            speed={0.5}
+            speed={0.3}
           />
         </Suspense>
       </Canvas>
@@ -206,5 +153,5 @@ export default function SharkScene() {
   );
 }
 
-// Предварительная загрузка модели
+// Предзагрузка
 useGLTF.preload('/models/shark.glb');
